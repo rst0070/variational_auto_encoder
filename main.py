@@ -7,6 +7,8 @@ import config
 import os
 from trainer import Trainer
 from model.mlp import BernoulliMLP
+from model.unet import UNet
+from model.resnet import ResNet34Bernoulli
 
 class Main:
     
@@ -53,6 +55,8 @@ class Main:
         ###
         self.max_epoch = exp_config.max_epoch
         self.model = BernoulliMLP(sys_config.device).to(sys_config.device)
+        #self.model = UNet(sys_config.device).to(sys_config.device)
+        #self.model = ResNet34Bernoulli(sys_config.device).to(sys_config.device)
         
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),

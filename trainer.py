@@ -3,7 +3,7 @@ import torch.nn as nn
 from tqdm import tqdm
 import torch.nn.functional as F
 import torch.utils.data as data
-from data.celeba import Celeba
+from data.celeba import Celeba, CelebaCrop
 from loss.bernoulli import BernoulliLoss
 import config
 import wandb
@@ -32,6 +32,7 @@ class Trainer:
         ###    Select Training dataset between TAN and PAS
         ###
         train_dataset = Celeba()
+        #train_dataset = CelebaCrop()
         
         self.train_loader = data.DataLoader(
             dataset=train_dataset,

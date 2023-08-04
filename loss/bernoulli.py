@@ -17,6 +17,7 @@ class BernoulliLoss(nn.Module):
         """
         x = torch.flatten(input=x, start_dim=1)
         p = torch.flatten(input=p, start_dim=1)
+        #print(x.shape, p.shape)
         
         reconstruction_err = - (1 - x) * torch.log10(1 - p + 1e-8) - x * torch.log10(p + 1e-8)
         reconstruction_err = torch.sum(reconstruction_err)

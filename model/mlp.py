@@ -7,21 +7,21 @@ class BernoulliMLP(nn.Module):
         super(BernoulliMLP, self).__init__()
         
         self.device = device
-        self.J = 10
+        self.J = 256
         self.D = 116412 #(3, 218, 178) # 116,412
         self.encoder = nn.Sequential(
             nn.Linear(in_features=116412, out_features=1164),
             nn.ReLU(),
-            nn.Linear(in_features=1164, out_features=116),
+            nn.Linear(in_features=1164, out_features=500),
             nn.ReLU(),
-            nn.Linear(in_features=116, out_features=self.J * 2)
+            nn.Linear(in_features=500, out_features=self.J * 2)
         )
         
         
         self.decoder = nn.Sequential(
-            nn.Linear(in_features=self.J, out_features=116),
+            nn.Linear(in_features=self.J, out_features=500),
             nn.ReLU(),
-            nn.Linear(in_features=116, out_features=1164),
+            nn.Linear(in_features=500, out_features=1164),
             nn.ReLU(),
             nn.Linear(in_features=1164, out_features=116412)
         )

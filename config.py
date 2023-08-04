@@ -31,7 +31,7 @@ class SysConfig:
         self.wandb_name             = ''
         # ------------------ device setting ------------------ #
         self.num_workers            = 4
-        self.device                 =   'cuda:0'
+        self.device                 =   'cuda:1'
         """device to use for training and testing"""
         
         self.random_seed            = 1234

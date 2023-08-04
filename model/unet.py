@@ -152,7 +152,6 @@ class Hooker(nn.Module):
         if self.storage is not None:
             self.storage[self.hooking_id] = x
         if self.forward_function is not None:
-            print(self.forward_function)
             return self.forward_function(x)
         return x
 
@@ -161,19 +160,18 @@ class UNet(nn.Module):
     mel spec --> encoder --> code
                     |
             -->  decoder
-                    |
-            -->  extractor
+                    
 
     need to implement those skip connections(|) 
     """
 
-    def __init__(self):
+    def __init__(self, device):
         """
         conv1 -> encoders -> decoders -> tconv -> conv2 -> extractors -> fc & pooling
         """
         super(UNet, self).__init__()
 
-
+        self.device = device
         #       storage to save output of each blocks   #
         self.storage = {
             'CV1' : None,
@@ -194,10 +192,13 @@ class UNet(nn.Module):
         self.encoders = nn.Sequential(
             EncoderBlock(in_channel=16, out_channel=16, num_blocks=3, stride=1),
             Hooker(storage=self.storage, save_id='EB1', forward_function=None),
+            
             EncoderBlock(in_channel=16, out_channel=32, num_blocks=4, stride=2),
             Hooker(storage=self.storage, save_id='EB2', forward_function=None),
+            
             EncoderBlock(in_channel=32, out_channel=64, num_blocks=6, stride=2),
             Hooker(storage=self.storage, save_id='EB3', forward_function=None),
+            
             EncoderBlock(in_channel=64, out_channel=128, num_blocks=3, stride=1),
             Hooker(storage=self.storage, save_id='EB4', forward_function=None),
         )
@@ -206,44 +207,51 @@ class UNet(nn.Module):
         self.decoders = nn.Sequential(
             Hooker(forward_function=(lambda x: torch.stack((x, self.storage['EB4'])))),
             DecoderBlock(in_channel=128, out_channel=64, num_blocks=3, stride=1),
-            Hooker(storage=self.storage, save_id='DB1', forward_function=(lambda x: torch.stack((x, self.storage['EB3'])))),
+            
+            Hooker(forward_function=(lambda x: torch.stack((x, self.storage['EB3'])))),
             DecoderBlock(in_channel=64, out_channel=32, num_blocks=6, stride=2),
-            Hooker(storage=self.storage, save_id='DB2', forward_function=(lambda x: torch.stack((x, self.storage['EB2'])))),
+            
+            Hooker(forward_function=(lambda x: torch.stack((x, self.storage['EB2'])))),
             DecoderBlock(in_channel=32, out_channel=16, num_blocks=4, stride=2),
-            Hooker(storage=self.storage, save_id='DB3', forward_function=(lambda x: torch.stack((x, self.storage['EB1'])))),
-            DecoderBlock(in_channel=16, out_channel=16, num_blocks=3, stride=1),
-            Hooker(storage=self.storage, save_id='DB4')
+            
+            Hooker(forward_function=(lambda x: torch.stack((x, self.storage['EB1'])))),
+            DecoderBlock(in_channel=16, out_channel=16, num_blocks=3, stride=1)
         )
             
         #       setting TConv               #
         self.tconv = nn.Sequential(
             Hooker(forward_function=(lambda x: torch.cat((x, self.storage['CV1']), dim=1))),
-            nn.ConvTranspose2d(in_channels=16*2, out_channels=1, kernel_size=(1,1), padding=0, stride = (1,1), bias=False)
+            nn.ConvTranspose2d(in_channels=16*2, out_channels=3, kernel_size=(1,1), padding=0, stride = (1,1), bias=False)
         )
 
 
-    def forward(self, s, is_test=False):
+    def forward(self, x, is_test=False):
         """
-        s - original speech(mel spectrogram)
-        es - enhanced speech
         """
-
+        batch_size = len(x)
         # conv
-        s = self.conv1(s)
+        x = self.conv1(x)
 
         #Encoder Path
-        s = self.encoders(s)
-
+        code = self.encoders(x)
+        mean, std = code[:, 0 : 64, :, :], code[:, 64 : , :, :]
+        
+        epsilon1 = torch.normal(mean=torch.zeros_like(mean), std=torch.ones_like(std)).to(self.device)
+        epsilon2 = torch.normal(mean=torch.zeros_like(mean), std=torch.ones_like(std)).to(self.device)
+        z1 = mean + std * epsilon1
+        z2 = mean + std * epsilon2
+        z = torch.cat((z1, z2), dim=1)
+        
         #Decoder Path
-        s = self.decoders(s)
+        p = self.decoders(z)
 
         # transpose conv
-        es = self.tconv(s) # enhanced speech
-        
-        return es
+        p = self.tconv(p)
+        p = torch.sigmoid(p)
+        return p, mean, std
 
 if __name__ == "__main__":
-    from torchsummary import summary
+    from torchinfo import summary
 
-    model = UNet().cuda()
-    summary(model, (3, 224, 178))
+    model = UNet('cuda:0').cuda()
+    summary(model, (2, 3, 128, 128))
